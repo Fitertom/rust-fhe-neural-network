@@ -4,20 +4,30 @@
 
 <div align="center">
 
-<!-- 
-    VIDEO: Upload your demo video (mp4) to the GitHub issue editor or drag-and-drop it here when editing the README on GitHub. 
-    GitHub will generate a link like: https://github.com/user/repo/assets/...
--->
+<!-- DEMO VIDEO -->
 <video src="https://github.com/user-attachments/assets/a878c12a-7e6b-4b02-b662-cae0a6c319fa" controls="controls" style="max-width: 700px;">
-
-
 </video>
 
 <br/>
 
-<!-- 
-    ARCHITECTURE: Place your diagram image in a folder like `assets/` and link it here.
--->
+<!-- QAT ANALYSIS GRAPH -->
+<h3>📊 QAT Training Analysis</h3>
+<img src="assets/qat_analysis.png" alt="QAT Training Analysis" width="700">
+
+<div align="left" style="max-width: 700px; margin: 0 auto;">
+<p>
+    <b>Сравнение эффективности обучения (Quantization Aware Training):</b>
+</p>
+<ul>
+    <li>🟢 <b>Green</b>: Обучение на смешанном датасете (My Assets + Fonts). Медленная сходимость.</li>
+    <li>🔴 <b>Red</b> (LR=0.03) & 🔵 <b>Blue</b> (LR=0.06): Обучение на том же смешанном датасете, но с повышенным Learning Rate. Быстрее выходят на плато.</li>
+    <li>🟡 <b>Yellow</b> (LR=0.03) & 🟣 <b>Purple</b> (LR=0.06): Режим <code>train_only_my</code>. Обучение <b>только</b> на пользовательском датасете. Моментальная сходимость и высокая точность под конкретный почерк.</li>
+</ul>
+</div>
+
+<br/>
+
+<!-- ARCHITECTURE DIAGRAM -->
 <img src="assets/architecture_diagram.png" alt="PPNN Architecture" width="700">
 
 </div>
@@ -85,4 +95,3 @@ cargo run --release -- train
 *   **TFHE/LWE**: Full custom implementation of crypto logic.
 *   **BigInt**: Client-side cryptography in pure JavaScript.
 *   **Neural Network**: Custom `Vec<f64>` / `Vec<u64>` implementation (no Torch/TensorFlow dependencies).
-

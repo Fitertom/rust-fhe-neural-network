@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPNN — Privacy-Preserving Neural Network</title>
+    <meta name="description"
+        content="Draw a digit and classify it using fully homomorphic encryption. The server never sees your plaintext data.">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a2e;
+            --bg-card-hover: #1e1e35;
+            --accent-primary: #6c63ff;
+            --accent-secondary: #ff6b9d;
+            --accent-glow: rgba(108, 99, 255, 0.3);
+            --text-primary: #e8e6f0;
+            --text-secondary: #8b8a9e;
+            --text-muted: #5a5970;
+            --border: #2a2a40;
+            --success: #4ade80;
+            --warning: #fbbf24;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        /* Animated grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                linear-gradient(rgba(108, 99, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(108, 99, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: 0;
+        }
+
+        header {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 3rem 2rem 1.5rem;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            font-weight: 300;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 0.75rem;
+        }
+
+        .badge-fhe {
+            background: rgba(108, 99, 255, 0.15);
+            color: var(--accent-primary);
+            border: 1px solid rgba(108, 99, 255, 0.3);
+        }
+
+        main {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            gap: 2rem;
+            padding: 0 2rem 3rem;
+            width: 100%;
+            max-width: 900px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            backdrop-filter: blur(10px);
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .panel:hover {
+            border-color: rgba(108, 99, 255, 0.3);
+            box-shadow: 0 0 30px rgba(108, 99, 255, 0.08);
+        }
+
+        .panel-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        /* Canvas panel */
+        .canvas-panel {
+            flex: 0 0 auto;
+        }
+
+        #drawCanvas {
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            cursor: crosshair;
+            display: block;
+            background: #000;
+            transition: border-color 0.3s;
+            image-rendering: pixelated;
+        }
+
+        #drawCanvas:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .canvas-controls {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        button {
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+            font-size: 0.85rem;
+            border: none;
+            border-radius: 10px;
+            padding: 0.6rem 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-primary), #5a4fe0);
+            color: white;
+            flex: 1;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        /* Result panel */
+        .result-panel {
+            flex: 1 1 300px;
+            min-width: 280px;
+        }
+
+        .prediction-display {
+            text-align: center;
+            padding: 1.5rem 0 1rem;
+        }
+
+        .predicted-digit {
+            font-size: 5rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+            opacity: 0.3;
+            transition: opacity 0.3s;
+        }
+
+        .predicted-digit.active {
+            opacity: 1;
+        }
+
+        .predicted-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .confidence-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            margin-top: 1rem;
+        }
+
+        .conf-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .conf-label {
+            width: 1rem;
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .conf-bar-bg {
+            flex: 1;
+            height: 8px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .conf-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .conf-bar-fill.winner {
+            background: linear-gradient(90deg, var(--success), #22d3ee);
+        }
+
+        /* Status */
+        .status-bar {
+            margin-top: 1.25rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .status-text {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .status-text.encrypting {
+            color: var(--warning);
+        }
+
+        .status-text.processing {
+            color: var(--accent-primary);
+        }
+
+        .status-text.done {
+            color: var(--success);
+        }
+
+        /* Pipeline visualization */
+        .pipeline {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .pipe-step {
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            transition: all 0.3s;
+        }
+
+        .pipe-step.active {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .pipe-step.done {
+            border-color: var(--success);
+            color: var(--success);
+        }
+
+        .pipe-arrow {
+            color: var(--text-muted);
+        }
+
+        /* Loading spinner */
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        /* Crypto info panel */
+        .info-panel {
+            width: 100%;
+            margin-top: 0rem;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .info-item {
+            background: var(--bg-secondary);
+            padding: 0.75rem;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .info-item-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+        }
+
+        .info-item-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--accent-primary);
+        }
+
+        @media (max-width: 640px) {
+            main {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .result-panel {
+                min-width: unset;
+                width: 100%;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>🔐 Privacy-Preserving Neural Network</h1>
+        <p class="subtitle">Draw a digit — it's encrypted before leaving your browser</p>
+        <span class="badge badge-fhe">LWE · FHE · Bootstrapped</span>
+    </header>
+
+    <main>
+        <div class="panel canvas-panel">
+            <div class="panel-title">✏️ Draw a Digit</div>
+            <div style="position: relative; display: inline-block;">
+                <canvas id="drawCanvas" width="280" height="280"></canvas>
+                <div
+                    style="position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.8); border: 1px solid var(--border); border-radius: 8px; padding: 6px; pointer-events: none;">
+                    <div
+                        style="font-size: 0.6rem; color: var(--text-muted); text-align: center; margin-bottom: 4px; letter-spacing: 0.5px;">
+                        INPUT</div>
+                    <canvas id="previewCanvas" width="28" height="28"
+                        style="width: 56px; height: 56px; image-rendering: pixelated; border: 1px solid #333; background: #000; display: block;"></canvas>
+                </div>
+            </div>
+            <div class="canvas-controls">
+                <button class="btn-secondary" onclick="clearCanvas()">🗑 Clear</button>
+                <button class="btn-primary" id="predictBtn" onclick="predict()" disabled>
+                    🔮 Encrypt & Predict
+                </button>
+            </div>
+            <div class="pipeline">
+                <span class="pipe-step" id="step-draw">Draw</span>
+                <span class="pipe-arrow">→</span>
+                <span class="pipe-step" id="step-enc">Encrypt</span>
+                <span class="pipe-arrow">→</span>
+                <span class="pipe-step" id="step-infer">Infer</span>
+                <span class="pipe-arrow">→</span>
+                <span class="pipe-step" id="step-dec">Decrypt</span>
+            </div>
+        </div>
+
+        <div class="panel result-panel">
+            <div class="panel-title">📊 Prediction Result</div>
+            <div class="prediction-display">
+                <div class="predicted-digit" id="predDigit">?</div>
+                <div class="predicted-label" id="predLabel">Draw a digit and click predict</div>
+            </div>
+            <div class="confidence-bars" id="confBars"></div>
+            <div class="status-bar">
+                <div class="status-text" id="statusText">Ready — waiting for input</div>
+            </div>
+        </div>
+
+        <div class="panel info-panel">
+            <div class="panel-title">🔑 Cryptographic Parameters</div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-item-label">Key Dimension (n)</div>
+                    <div class="info-item-value" id="param-n">—</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-item-label">Modulus (Q)</div>
+                    <div class="info-item-value" id="param-q">—</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-item-label">Plaintext Space (t)</div>
+                    <div class="info-item-value" id="param-t">—</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-item-label">Scaling Factor (Δ)</div>
+                    <div class="info-item-value" id="param-delta">—</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-item-label">Encrypted Pixels</div>
+                    <div class="info-item-value" id="param-pixels">784</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-item-label">Ciphertext Size</div>
+                    <div class="info-item-value" id="param-ctsize">—</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ============================================================
+        // LWE ENCRYPTION IN JAVASCRIPT
+        // This mirrors the Rust LWE implementation for client-side
+        // encryption/decryption. The secret key is fetched from the server
+        // (demo only — in production it would be generated client-side).
+        // ============================================================
+
+        let secretKey = null;
+        let params = null;
+        const MASK = (1n << 64n) - 1n; // 2^64 - 1 for wrapping u64 arithmetic
+
+        // Wrapping u64 BigInt arithmetic helpers
+        const u64 = (x) => ((x % (MASK + 1n)) + (MASK + 1n)) & MASK;
+        const u64add = (a, b) => (a + b) & MASK;
+        const u64mul = (a, b) => (a * b) & MASK;
+        const u64sub = (a, b) => (a - b + MASK + 1n) & MASK;
+
+        // Centered binomial noise (k=8)
+        function sampleNoise() {
+            let sumA = 0n, sumB = 0n;
+            for (let i = 0; i < 8; i++) {
+                sumA += Math.random() < 0.5 ? 0n : 1n;
+                sumB += Math.random() < 0.5 ? 0n : 1n;
+            }
+            return u64(sumA - sumB);
+        }
+
+        // Random u64 using crypto.getRandomValues for full 64-bit range
+        function randU64() {
+            const arr = new Uint32Array(2);
+            crypto.getRandomValues(arr);
+            return (BigInt(arr[1]) << 32n) | BigInt(arr[0]);
+        }
+
+        // LWE Encrypt: (a, b) where b = <a,s> + Δ·m + e
+        // key values are 0n/1n (BigInt), delta and m are BigInt
+        function lweEncrypt(m, key, delta) {
+            const n = key.length;
+            const a = new Array(n);
+            let dot = 0n;
+            for (let i = 0; i < n; i++) {
+                a[i] = randU64();
+                dot = u64add(dot, u64mul(a[i], key[i]));
+            }
+            const noise = sampleNoise();
+            const b = u64add(u64add(dot, u64mul(delta, m)), noise);
+            return { a, b };
+        }
+
+        // LWE Decrypt: m = round((b - <a,s>) * t / Q)
+        // All values are BigInt
+        function lweDecrypt(ct, key, t, delta) {
+            const n = key.length;
+            let dot = 0n;
+            for (let i = 0; i < n; i++) {
+                dot = u64add(dot, u64mul(ct.a[i], key[i]));
+            }
+            const phase = u64sub(ct.b, dot);
+            const shifted = u64add(phase, delta / 2n);
+            const m = (shifted / delta) % t;
+            return Number(m);
+        }
+
+        // ============================================================
+        // CANVAS DRAWING
+        // ============================================================
+
+        const canvas = document.getElementById('drawCanvas');
+        const ctx = canvas.getContext('2d');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const previewCtx = previewCanvas.getContext('2d');
+        let isDrawing = false;
+        let hasDrawn = false;
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, 280, 280);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 20; // Reverted to 20 to match collector exactly
+
+        function updatePreview() {
+            if (!hasDrawn) {
+                previewCtx.fillStyle = '#000';
+                previewCtx.fillRect(0, 0, 28, 28);
+                return;
+            }
+            const pixels = getPixels28x28();
+            const imgData = previewCtx.createImageData(28, 28);
+            const d = imgData.data;
+            const INPUT_SCALE = 15;
+
+            for (let i = 0; i < 784; i++) {
+                // Quantize exactly like the model input
+                const val = pixels[i]; // 0..255
+                const q = Math.round((val / 255.0) * INPUT_SCALE); // 0, 1, 2, 3
+
+                // Map to visualization colors
+                const color = Math.round((q / INPUT_SCALE) * 255);
+
+                d[i * 4] = color;
+                d[i * 4 + 1] = color;
+                d[i * 4 + 2] = color;
+                d[i * 4 + 3] = 255;
+            }
+            previewCtx.putImageData(imgData, 0, 0);
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            ctx.beginPath();
+            ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDrawing) return;
+            hasDrawn = true;
+            const rect = canvas.getBoundingClientRect();
+            ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+            ctx.stroke();
+            document.getElementById('predictBtn').disabled = false;
+            setPipeStep('draw');
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDrawing = false;
+            updatePreview();
+        });
+        canvas.addEventListener('mouseleave', () => {
+            isDrawing = false;
+            updatePreview();
+        });
+
+        // Touch support
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            const t = e.touches[0];
+            ctx.beginPath();
+            ctx.moveTo(t.clientX - rect.left, t.clientY - rect.top);
+        });
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!isDrawing) return;
+            hasDrawn = true;
+            const rect = canvas.getBoundingClientRect();
+            const t = e.touches[0];
+            ctx.lineTo(t.clientX - rect.left, t.clientY - rect.top);
+            ctx.stroke();
+            document.getElementById('predictBtn').disabled = false;
+            setPipeStep('draw');
+        });
+        canvas.addEventListener('touchend', () => {
+            isDrawing = false;
+            updatePreview();
+        });
+
+        function clearCanvas() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, 280, 280);
+            hasDrawn = false;
+            updatePreview();
+            document.getElementById('predictBtn').disabled = true;
+            document.getElementById('predDigit').textContent = '?';
+            document.getElementById('predDigit').classList.remove('active');
+            document.getElementById('predLabel').textContent = 'Draw a digit and click predict';
+            resetPipeSteps();
+            resetBars();
+        }
+
+        // Downscale 280×280 to 28×28 with CENTER NORMALIZATION
+        // Matches the training pipeline: bounding box → crop → scale to ~20×20 → center on 28×28
+        function getPixels28x28() {
+            const sw = canvas.width, sh = canvas.height;
+            const imgData = ctx.getImageData(0, 0, sw, sh);
+            const d = imgData.data;
+
+            // Convert to grayscale float
+            const gray = new Float32Array(sw * sh);
+            for (let i = 0; i < sw * sh; i++) {
+                gray[i] = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) / 255.0;
+            }
+
+            // Find bounding box
+            let minX = sw, minY = sh, maxX = 0, maxY = 0;
+            let hasContent = false;
+            for (let y = 0; y < sh; y++) {
+                for (let x = 0; x < sw; x++) {
+                    if (gray[y * sw + x] > 0.08) {
+                        hasContent = true;
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                    }
+                }
+            }
+            if (!hasContent) return new Array(784).fill(0);
+
+            const cropW = maxX - minX + 1;
+            const cropH = maxY - minY + 1;
+
+            // Scale to fit in 20×20
+            const targetSize = 20;
+            const scale = targetSize / Math.max(cropW, cropH);
+            const scaledW = Math.max(1, Math.round(cropW * scale));
+            const scaledH = Math.max(1, Math.round(cropH * scale));
+
+            // Area-average downsampling
+            const scaled = new Float32Array(scaledW * scaledH);
+            for (let sy = 0; sy < scaledH; sy++) {
+                for (let sx = 0; sx < scaledW; sx++) {
+                    const srcX0 = minX + sx / scale;
+                    const srcX1 = minX + (sx + 1) / scale;
+                    const srcY0 = minY + sy / scale;
+                    const srcY1 = minY + (sy + 1) / scale;
+                    let sum = 0, count = 0;
+                    for (let iy = Math.floor(srcY0); iy < Math.ceil(srcY1) && iy < sh; iy++) {
+                        for (let ix = Math.floor(srcX0); ix < Math.ceil(srcX1) && ix < sw; ix++) {
+                            const overlapX = Math.min(ix + 1, srcX1) - Math.max(ix, srcX0);
+                            const overlapY = Math.min(iy + 1, srcY1) - Math.max(iy, srcY0);
+                            const weight = Math.max(0, overlapX) * Math.max(0, overlapY);
+                            sum += gray[iy * sw + ix] * weight;
+                            count += weight;
+                        }
+                    }
+                    scaled[sy * scaledW + sx] = count > 0 ? sum / count : 0;
+                }
+            }
+
+            // Contrast stretch
+            let maxVal = 0;
+            for (let i = 0; i < scaled.length; i++) {
+                if (scaled[i] > maxVal) maxVal = scaled[i];
+            }
+            const contrastScale = maxVal > 0.01 ? 1.0 / maxVal : 1.0;
+
+            // Center on 28×28
+            const offsetX = Math.round((28 - scaledW) / 2);
+            const offsetY = Math.round((28 - scaledH) / 2);
+            const pixels = new Array(784).fill(0);
+            for (let sy = 0; sy < scaledH; sy++) {
+                for (let sx = 0; sx < scaledW; sx++) {
+                    const px = offsetX + sx;
+                    const py = offsetY + sy;
+                    if (px >= 0 && px < 28 && py >= 0 && py < 28) {
+                        pixels[py * 28 + px] = Math.min(255, Math.round(scaled[sy * scaledW + sx] * contrastScale * 255));
+                    }
+                }
+            }
+            return pixels;
+        }
+
+        // ============================================================
+        // CONFIDENCE BARS
+        // ============================================================
+
+        function initBars() {
+            const container = document.getElementById('confBars');
+            container.innerHTML = '';
+            for (let d = 0; d < 10; d++) {
+                container.innerHTML += `
+                <div class="conf-row">
+                    <span class="conf-label">${d}</span>
+                    <div class="conf-bar-bg">
+                        <div class="conf-bar-fill" id="bar-${d}"></div>
+                    </div>
+                </div>`;
+            }
+        }
+
+        function resetBars() {
+            for (let d = 0; d < 10; d++) {
+                const bar = document.getElementById(`bar-${d}`);
+                if (bar) {
+                    bar.style.width = '0%';
+                    bar.classList.remove('winner');
+                }
+            }
+        }
+
+        function updateBars(values) {
+            const max = Math.max(...values);
+            const min = Math.min(...values);
+            const range = max - min || 1;
+            const winner = values.indexOf(max);
+
+            for (let d = 0; d < 10; d++) {
+                const bar = document.getElementById(`bar-${d}`);
+                const pct = Math.max(0, ((values[d] - min) / range) * 100);
+                bar.style.width = pct + '%';
+                bar.classList.toggle('winner', d === winner);
+            }
+        }
+
+        // ============================================================
+        // PIPELINE STEPS UI
+        // ============================================================
+
+        function setPipeStep(step) {
+            ['draw', 'enc', 'infer', 'dec'].forEach(s => {
+                const el = document.getElementById(`step-${s}`);
+                el.classList.remove('active', 'done');
+            });
+
+            const steps = ['draw', 'enc', 'infer', 'dec'];
+            const idx = steps.indexOf(step);
+            for (let i = 0; i < idx; i++) {
+                document.getElementById(`step-${steps[i]}`).classList.add('done');
+            }
+            document.getElementById(`step-${step}`).classList.add('active');
+        }
+
+        function resetPipeSteps() {
+            ['draw', 'enc', 'infer', 'dec'].forEach(s => {
+                document.getElementById(`step-${s}`).classList.remove('active', 'done');
+            });
+        }
+
+        function allStepsDone() {
+            ['draw', 'enc', 'infer', 'dec'].forEach(s => {
+                document.getElementById(`step-${s}`).classList.remove('active');
+                document.getElementById(`step-${s}`).classList.add('done');
+            });
+        }
+
+        // ============================================================
+        // STATUS
+        // ============================================================
+
+        function setStatus(text, cls) {
+            const el = document.getElementById('statusText');
+            el.textContent = text;
+            el.className = 'status-text ' + (cls || '');
+        }
+
+        // ============================================================
+        // PREDICT
+        // ============================================================
+
+        const INPUT_SCALE = 15; // Must match nn::INPUT_SCALE in Rust
+
+        async function predict() {
+            if (!secretKey || !params) {
+                setStatus('Error: keys not loaded yet', '');
+                return;
+            }
+
+            const btn = document.getElementById('predictBtn');
+            btn.disabled = true;
+
+            try {
+                // Step 1: Get centered 28×28 pixels
+                const pixels = getPixels28x28();
+
+                // Step 2: Encrypt
+                setPipeStep('enc');
+                setStatus('Encrypting 784 pixels with LWE...', 'encrypting');
+                await new Promise(r => setTimeout(r, 50)); // let UI update
+
+                const delta = params.delta; // BigInt
+                const ciphertexts = [];
+
+                for (let i = 0; i < 784; i++) {
+                    // Quantize pixel [0,255] → [0, INPUT_SCALE] (matching training)
+                    const m = BigInt(Math.round(pixels[i] / 255 * INPUT_SCALE));
+                    const ct = lweEncrypt(m, secretKey, delta);
+                    ciphertexts.push(ct);
+                }
+
+                setStatus(`Encrypted 784 pixels → ${ciphertexts.length} ciphertexts. Sending...`, 'encrypting');
+
+                // Step 3: Send to server (serialize BigInt as strings)
+                setPipeStep('infer');
+                setStatus('Server performing encrypted inference (bootstrapping)...', 'processing');
+
+                const wireData = ciphertexts.map(ct => ({
+                    a: ct.a.map(v => v.toString()),
+                    b: ct.b.toString()
+                }));
+
+                const resp = await fetch('/infer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ciphertexts: wireData }),
+                });
+
+                if (!resp.ok) {
+                    const err = await resp.text();
+                    throw new Error(`Server error: ${err}`);
+                }
+
+                const result = await resp.json();
+
+                // Step 4: Decrypt (parse string values back to BigInt)
+                setPipeStep('dec');
+                setStatus('Decrypting 10 output ciphertexts...', 'encrypting');
+                await new Promise(r => setTimeout(r, 50));
+
+                const outputs = result.results.map(ct => {
+                    const parsed = {
+                        a: ct.a.map(s => BigInt(s)),
+                        b: BigInt(ct.b)
+                    };
+                    return lweDecrypt(parsed, secretKey, params.t, params.delta);
+                });
+
+                // Correct sign interpretation: [0, T/2) is positive, [T/2, T) is negative
+                const tVal = Number(params.t);
+                const signedOutputs = outputs.map(v => v >= tVal / 2 ? v - tVal : v);
+
+                // Find argmax of SIGNED outputs
+                let maxVal = -Infinity, maxIdx = 0;
+                signedOutputs.forEach((v, i) => { if (v > maxVal) { maxVal = v; maxIdx = i; } });
+
+                // Display results
+                document.getElementById('predDigit').textContent = maxIdx;
+                document.getElementById('predDigit').classList.add('active');
+                document.getElementById('predLabel').textContent = `Predicted: ${maxIdx} (encrypted inference)`;
+                updateBars(signedOutputs);
+                allStepsDone();
+                setStatus(`✅ Done! Predicted digit: ${maxIdx}`, 'done');
+
+            } catch (err) {
+                setStatus(`❌ Error: ${err.message}`, '');
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // ============================================================
+        // INITIALIZATION
+        // ============================================================
+
+        async function init() {
+            initBars();
+
+            try {
+                // Fetch LWE parameters
+                const paramsResp = await fetch('/params');
+                params = await paramsResp.json();
+
+                // Parse params — t and delta come as strings (u64 values)
+                params.t = BigInt(params.t);
+                params.delta = BigInt(params.delta);
+
+                document.getElementById('param-n').textContent = params.n;
+                document.getElementById('param-q').textContent = `2^${params.q_bits}`;
+                document.getElementById('param-t').textContent = params.t.toLocaleString();
+                document.getElementById('param-delta').textContent = params.delta.toLocaleString();
+                document.getElementById('param-ctsize').textContent = `${(params.n + 1) * 8} B`;
+
+                // Fetch secret key (demo only!)
+                // Key values are 0/1 so they fit in JSON numbers — convert to BigInt for crypto
+                const keyResp = await fetch('/key');
+                const keyData = await keyResp.json();
+                secretKey = keyData.secret_key.map(v => BigInt(v));
+
+                setStatus(`Ready — key loaded (n=${params.n}, t=${params.t})`, '');
+                document.getElementById('predictBtn').disabled = true; // until drawn
+
+            } catch (err) {
+                setStatus(`Failed to connect: ${err.message}`, '');
+            }
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

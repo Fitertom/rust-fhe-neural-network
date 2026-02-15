@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPNN Dataset Collector</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a2e;
+            --bg-card-hover: #1e1e35;
+            --accent-primary: #6c63ff;
+            --accent-secondary: #ff6b9d;
+            --text-primary: #e8e6f0;
+            --text-secondary: #8b8a9e;
+            --text-muted: #5a5970;
+            --border: #2a2a40;
+            --success: #4ade80;
+            --error: #f43f5e;
+            --warning: #fbbf24;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+        }
+
+        main {
+            display: flex;
+            gap: 2rem;
+            padding: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 320px;
+        }
+
+        .canvas-row {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+
+        canvas {
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            background: #000;
+        }
+
+        #drawCanvas {
+            cursor: crosshair;
+            image-rendering: pixelated;
+        }
+
+        #previewCanvas {
+            image-rendering: pixelated;
+            opacity: 0.7;
+        }
+
+        .preview-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            text-align: center;
+            margin-bottom: 0.3rem;
+        }
+
+        .btn {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            margin-top: 0.5rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: #000;
+            border: none;
+            width: 100%;
+            font-weight: 600;
+        }
+
+        .btn-success:hover {
+            background: #22c55e;
+        }
+
+        .instructions {
+            margin-top: 1rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.5;
+            text-align: left;
+            width: 100%;
+        }
+
+        strong {
+            color: var(--accent-primary);
+        }
+
+        code {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.1em 0.3em;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono';
+            font-size: 0.85em;
+        }
+
+        #log {
+            width: 300px;
+            height: 400px;
+            overflow-y: auto;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .log-entry {
+            padding: 0.5rem;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .log-entry.success {
+            border-left: 3px solid var(--success);
+        }
+
+        .log-entry.info {
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        .log-entry.error {
+            border-left: 3px solid var(--error);
+        }
+
+        .section-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Dataset Collector</h1>
+        <p class="subtitle">Draw → Auto-Center → Save to ZIP</p>
+    </header>
+
+    <main>
+        <div class="panel">
+            <div class="section-label">Canvas</div>
+            <div class="canvas-row">
+                <canvas id="drawCanvas" width="280" height="280"></canvas>
+                <div>
+                    <div class="preview-label">28×28 preview</div>
+                    <canvas id="previewCanvas" width="56" height="56"></canvas>
+                </div>
+            </div>
+
+            <button class="btn" style="margin-top: 1rem; width: 100%;" onclick="clearCanvas()">🗑 Clear Canvas (Space /
+                C)</button>
+
+            <div style="margin-top: 1.5rem; width: 100%;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span class="section-label" style="margin: 0;">Session</span>
+                    <span id="count" style="font-family: 'JetBrains Mono'; color: var(--accent-primary);">0
+                        samples</span>
+                </div>
+                <button class="btn btn-success" onclick="downloadZip()">📦 Download ZIP Archive</button>
+            </div>
+
+            <div class="instructions">
+                1. Draw a digit.<br>
+                2. Press <strong>0-9</strong> to save (auto-centered).<br>
+                3. Click <strong>Download ZIP</strong> when done.<br>
+                4. Extract to <code>static/my_assets/</code>.
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="section-label">Session Log</div>
+            <div id="log"></div>
+        </div>
+    </main>
+
+    <script>
+        const canvas = document.getElementById('drawCanvas');
+        const ctx = canvas.getContext('2d');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const previewCtx = previewCanvas.getContext('2d');
+        let isDrawing = false;
+
+        const samples = [];
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, 280, 280);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 20;
+
+        // --- Drawing ---
+
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            if (e.touches) return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        }
+
+        function startDraw(e) {
+            e.preventDefault();
+            isDrawing = true;
+            ctx.beginPath();
+            const pos = getPos(e);
+            ctx.moveTo(pos.x, pos.y);
+        }
+
+        function endDraw() { isDrawing = false; ctx.beginPath(); updatePreview(); }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const pos = getPos(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+        }
+
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('mouseup', endDraw);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseleave', endDraw);
+        canvas.addEventListener('touchstart', startDraw, { passive: false });
+        canvas.addEventListener('touchend', endDraw);
+        canvas.addEventListener('touchmove', draw, { passive: false });
+
+        function clearCanvas() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, 280, 280);
+            ctx.beginPath();
+            previewCtx.fillStyle = '#000';
+            previewCtx.fillRect(0, 0, 56, 56);
+        }
+
+        function log(msg, type = 'info') {
+            const el = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            entry.innerHTML = `<span style="font-weight: 500">${msg}</span> <span style="opacity:0.5; font-size: 0.7em;">${time}</span>`;
+            el.prepend(entry);
+        }
+
+        function updateCount() {
+            document.getElementById('count').textContent = `${samples.length} samples`;
+        }
+
+        // --- CENTER NORMALIZATION (pixel-level, high-quality) ---
+        // 1. Convert to grayscale float array (280x280)
+        // 2. Find bounding box
+        // 3. Crop, scale to ~20x20 using area-average downsampling
+        // 4. Center on 28x28
+        // 5. Stretch contrast so max brightness = 255
+        function centerAndNormalize(sourceCanvas) {
+            const sw = sourceCanvas.width;
+            const sh = sourceCanvas.height;
+            const srcCtx = sourceCanvas.getContext('2d');
+            const imgData = srcCtx.getImageData(0, 0, sw, sh);
+            const d = imgData.data;
+
+            // Convert to grayscale float array
+            const gray = new Float32Array(sw * sh);
+            for (let i = 0; i < sw * sh; i++) {
+                // Use luminance formula
+                gray[i] = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) / 255.0;
+            }
+
+            // Find bounding box (threshold > 0.08)
+            let minX = sw, minY = sh, maxX = 0, maxY = 0;
+            let hasContent = false;
+            for (let y = 0; y < sh; y++) {
+                for (let x = 0; x < sw; x++) {
+                    if (gray[y * sw + x] > 0.08) {
+                        hasContent = true;
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                    }
+                }
+            }
+            if (!hasContent) return null;
+
+            // Crop dimensions
+            const cropW = maxX - minX + 1;
+            const cropH = maxY - minY + 1;
+
+            // Scale to fit in 20x20 area (preserve aspect ratio)
+            const targetSize = 20;
+            const scale = targetSize / Math.max(cropW, cropH);
+            const scaledW = Math.max(1, Math.round(cropW * scale));
+            const scaledH = Math.max(1, Math.round(cropH * scale));
+
+            // Area-average downsampling (much better than canvas drawImage)
+            const scaled = new Float32Array(scaledW * scaledH);
+            for (let sy = 0; sy < scaledH; sy++) {
+                for (let sx = 0; sx < scaledW; sx++) {
+                    // Source region this pixel covers
+                    const srcX0 = minX + sx / scale;
+                    const srcX1 = minX + (sx + 1) / scale;
+                    const srcY0 = minY + sy / scale;
+                    const srcY1 = minY + (sy + 1) / scale;
+
+                    let sum = 0, count = 0;
+                    for (let iy = Math.floor(srcY0); iy < Math.ceil(srcY1) && iy < sh; iy++) {
+                        for (let ix = Math.floor(srcX0); ix < Math.ceil(srcX1) && ix < sw; ix++) {
+                            // Compute overlap fraction
+                            const overlapX = Math.min(ix + 1, srcX1) - Math.max(ix, srcX0);
+                            const overlapY = Math.min(iy + 1, srcY1) - Math.max(iy, srcY0);
+                            const weight = Math.max(0, overlapX) * Math.max(0, overlapY);
+                            sum += gray[iy * sw + ix] * weight;
+                            count += weight;
+                        }
+                    }
+                    scaled[sy * scaledW + sx] = count > 0 ? sum / count : 0;
+                }
+            }
+
+            // Find max brightness for contrast stretching
+            let maxVal = 0;
+            for (let i = 0; i < scaled.length; i++) {
+                if (scaled[i] > maxVal) maxVal = scaled[i];
+            }
+            const contrastScale = maxVal > 0.01 ? 1.0 / maxVal : 1.0;
+
+            // Place centered on 28x28
+            const offsetX = Math.round((28 - scaledW) / 2);
+            const offsetY = Math.round((28 - scaledH) / 2);
+
+            const outCanvas = document.createElement('canvas');
+            outCanvas.width = 28;
+            outCanvas.height = 28;
+            const outCtx = outCanvas.getContext('2d');
+            const outImg = outCtx.createImageData(28, 28);
+            const out = outImg.data;
+
+            // Fill black
+            for (let i = 0; i < 28 * 28 * 4; i += 4) {
+                out[i] = 0; out[i + 1] = 0; out[i + 2] = 0; out[i + 3] = 255;
+            }
+
+            // Place scaled digit with contrast stretch
+            for (let sy = 0; sy < scaledH; sy++) {
+                for (let sx = 0; sx < scaledW; sx++) {
+                    const px = offsetX + sx;
+                    const py = offsetY + sy;
+                    if (px >= 0 && px < 28 && py >= 0 && py < 28) {
+                        const v = Math.min(255, Math.round(scaled[sy * scaledW + sx] * contrastScale * 255));
+                        const idx = (py * 28 + px) * 4;
+                        out[idx] = v; out[idx + 1] = v; out[idx + 2] = v; out[idx + 3] = 255;
+                    }
+                }
+            }
+
+            outCtx.putImageData(outImg, 0, 0);
+            return outCanvas;
+        }
+
+        function updatePreview() {
+            const centered = centerAndNormalize(canvas);
+            previewCtx.fillStyle = '#000';
+            previewCtx.fillRect(0, 0, 56, 56);
+            if (centered) {
+                // Draw 28x28 scaled up to 56x56 for visibility
+                previewCtx.imageSmoothingEnabled = false;
+                previewCtx.drawImage(centered, 0, 0, 56, 56);
+            }
+        }
+
+        // --- Save ---
+
+        function saveDigit(label) {
+            const centered = centerAndNormalize(canvas);
+            if (!centered) {
+                log('Canvas empty!', 'error');
+                return;
+            }
+
+            const dataUrl = centered.toDataURL('image/png');
+            const base64 = dataUrl.split(',')[1];
+
+            samples.push({ label, base64, timestamp: Date.now() });
+
+            log(`Saved digit <strong>${label}</strong> (centered)`, 'success');
+            updateCount();
+
+            canvas.style.borderColor = 'var(--success)';
+            setTimeout(() => { canvas.style.borderColor = ''; clearCanvas(); }, 150);
+        }
+
+        async function downloadZip() {
+            if (samples.length === 0) {
+                log('No samples!', 'error');
+                return;
+            }
+
+            log(`Creating ZIP (${samples.length} samples)...`, 'info');
+
+            const zip = new JSZip();
+            const folder = zip.folder("my_assets");
+
+            samples.forEach((s, i) => {
+                const filename = `${s.label}_${s.timestamp}_${i}.png`;
+                folder.file(filename, s.base64, { base64: true });
+            });
+
+            try {
+                const content = await zip.generateAsync({ type: "blob" });
+                saveAs(content, "dataset_archive.zip");
+                log('ZIP downloaded!', 'success');
+            } catch (err) {
+                console.error(err);
+                log('ZIP error', 'error');
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key >= '0' && e.key <= '9') saveDigit(parseInt(e.key));
+            else if (e.key.toLowerCase() === 'c' || e.key === ' ') clearCanvas();
+        });
+    </script>
+</body>
+
+</html>
