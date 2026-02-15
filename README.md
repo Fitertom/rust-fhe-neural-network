@@ -8,7 +8,9 @@
     VIDEO: Upload your demo video (mp4) to the GitHub issue editor or drag-and-drop it here when editing the README on GitHub. 
     GitHub will generate a link like: https://github.com/user/repo/assets/...
 -->
-<video src="https://github.com/user-attachments/assets/PLACEHOLDER_VIDEO_URL" controls="controls" style="max-width: 700px;">
+<video src="https://github.com/user-attachments/assets/a878c12a-7e6b-4b02-b662-cae0a6c319fa" controls="controls" style="max-width: 700px;">
+
+
 </video>
 
 <br/>
@@ -83,3 +85,4 @@ cargo run --release -- train
 *   **TFHE/LWE**: Full custom implementation of crypto logic.
 *   **BigInt**: Client-side cryptography in pure JavaScript.
 *   **Neural Network**: Custom `Vec<f64>` / `Vec<u64>` implementation (no Torch/TensorFlow dependencies).
+
