@@ -1,97 +1,105 @@
-# 🔒 PPNN (Privacy-Preserving Neural Network)
+# PPNN (Privacy-Preserving Neural Network)
 
 **A fully homomorphic neural network built from scratch in Rust.**
 
 <div align="center">
 
-<!-- DEMO VIDEO -->
-<video src="https://github.com/user-attachments/assets/a878c12a-7e6b-4b02-b662-cae0a6c319fa" controls="controls" style="max-width: 700px;">
+<video src="[https://github.com/user-attachments/assets/a878c12a-7e6b-4b02-b662-cae0a6c319fa](https://github.com/user-attachments/assets/a878c12a-7e6b-4b02-b662-cae0a6c319fa)" controls="controls" style="max-width: 700px;">
 </video>
 
-<br/>
-
-<!-- QAT ANALYSIS GRAPH -->
-<h3>📊 QAT Training Analysis</h3>
+<h3>QAT Training Analysis</h3>
 <img src="assets/qat_analysis.png" alt="QAT Training Analysis" width="700">
 
 <div align="left" style="max-width: 700px; margin: 0 auto;">
 <p>
-    <b>Сравнение эффективности обучения (Quantization Aware Training):</b>
+<b>Training Efficiency Comparison (Quantization Aware Training):</b>
 </p>
 <ul>
-    <li>🟢 <b>Green</b>: Обучение на смешанном датасете (My Assets + Fonts). Медленная сходимость.</li>
-    <li>🔴 <b>Red</b> (LR=0.03) & 🔵 <b>Blue</b> (LR=0.06): Обучение на том же смешанном датасете, но с повышенным Learning Rate. Быстрее выходят на плато.</li>
-    <li>🟡 <b>Yellow</b> (LR=0.03) & 🟣 <b>Purple</b> (LR=0.06): Режим <code>train_only_my</code>. Обучение <b>только</b> на пользовательском датасете. Моментальная сходимость и высокая точность под конкретный почерк.</li>
+<li><b>Green</b>: Training on a mixed dataset (My Assets + Fonts). Slow convergence.</li>
+<li><b>Red</b> (LR=0.03) & <b>Blue</b> (LR=0.06): Training on the same mixed dataset but with an increased Learning Rate. Reaches a plateau faster.</li>
+<li><b>Yellow</b> (LR=0.03) & <b>Purple</b> (LR=0.06): <code>train_only_my</code> mode. Training <b>only</b> on the user dataset. Instant convergence and high accuracy for specific handwriting.</li>
 </ul>
 </div>
 
-<br/>
-
-<!-- ARCHITECTURE DIAGRAM -->
 <img src="assets/architecture_diagram.png" alt="PPNN Architecture" width="700">
 
 </div>
 
 ---
 
-**PPNN** — это полная implementation (с нуля, на Rust) системы распознавания рукописных цифр, работающая поверх гомоморфного шифрования (FHE).
+**PPNN** is a full implementation (from scratch, in Rust) of a handwritten digit recognition system operating on top of Fully Homomorphic Encryption (FHE).
 
-Сервер **никогда** не видит цифру, которую вы нарисовали. Он получает зашифрованные пиксели, производит вычисления (матричное умножение + активация через bootstrapping) и возвращает зашифрованный результат. Только вы (клиент в браузере) можете расшифровать ответ.
-
----
-
-## 🏗 Архитектура и Безопасность
-
-Проект реализует схему **TFHE (Torus FHE)** с программируемым бутстрэппингом.
-
-### Особенности реализации
-В данной демонстрационной версии сервер технически **имеет доступ** к приватному ключу (он генерируется при старте сервера), однако **все вычисления (инференс)** над данными пользователя производятся строго в зашифрованном виде с использованием гомоморфных операций (сложение, умножение на константу, bootstrapping). 
-
-Сервер не "подглядывает" в данные во время вычислений, а выполняет математические операции над "шумом", который превращается в осмысленный ответ только после расшифровки на клиенте.
-
-### Компоненты
-1.  **LWE Crypto Engine**: Кастомная реализация на Rust (`src/lwe.rs`, `src/bootstrap.rs`).
-2.  **Neural Network**: Двухслойная сеть, обученная на `f64` и квантованная в `u64`.
-3.  **Collector**: Инструмент для создания собственного датасета (`static/collector.html`).
+The server **never** sees the digit you drew. It receives encrypted pixels, performs calculations (matrix multiplication + activation via bootstrapping), and returns an encrypted result. Only you (the client in the browser) can decrypt the response.
 
 ---
 
-## 🚀 Запуск и Использование
+## Architecture and Security
 
-Проект полностью готов к работе "из коробки" — веса модели уже лежат в репозитории (`model_weights.json`).
+The project implements the **TFHE (Torus FHE)** scheme with programmable bootstrapping.
 
-### 1. Быстрый старт (Инференс)
-Запустите сервер с готовой моделью:
+### Implementation Details
+
+In this demo version, the server technically **has access** to the private key (it is generated when the server starts); however, **all computations (inference)** on user data are performed strictly in encrypted form using homomorphic operations (addition, multiplication by a constant, bootstrapping).
+
+The server does not "peek" into the data during calculations; instead, it performs mathematical operations on "noise," which turns into a meaningful answer only after decryption on the client side.
+
+### Components
+
+1. **LWE Crypto Engine**: Custom implementation in Rust (`src/lwe.rs`, `src/bootstrap.rs`).
+2. **Neural Network**: A two-layer network trained on `f64` and quantized to `u64`.
+3. **Collector**: A tool for creating your own dataset (`static/collector.html`).
+
+---
+
+## Launch and Usage
+
+The project is fully ready to work "out of the box" — model weights are already included in the repository (`model_weights.json`).
+
+### 1. Quick Start (Inference)
+
+Run the server with the pre-trained model:
+
 ```bash
 cargo run --release -- serve
+
 ```
-Откройте `http://localhost:3000` в браузере. Рисуйте цифры, и сервер будет их угадывать в зашифрованном виде.
 
-### 2. Сбор собственного датасета
-Хотите, чтобы сеть узнавала именно ваш почерк?
-1. Откройте файл `static/collector.html` в любом браузере (просто перетащите файл или через Live Server).
-2. Рисуйте цифры в квадрате.
-3. Нажимайте цифру на клавиатуре (0-9), чтобы сохранить семпл.
-4. Данные сохраняются в папку `static/my_assets/`.
+Open `http://localhost:3000` in your browser. Draw digits, and the server will guess them in encrypted form.
 
-### 3. Обучение на своих данных
-После сбора датасета запустите специальный режим обучения:
+### 2. Collecting Your Own Dataset
+
+Want the network to recognize your specific handwriting?
+
+1. Open the `static/collector.html` file in any browser (simply drag the file or use Live Server).
+2. Draw digits in the square.
+3. Press a number key on your keyboard (0-9) to save the sample.
+4. Data is saved to the `static/my_assets/` folder.
+
+### 3. Training on Your Own Data
+
+After collecting the dataset, run the special training mode:
+
 ```bash
 cargo run --release -- train_only_my
-```
-Это перетренирует модель **только** на ваших собранных примерах (очень быстро) и перезапишет `model_weights.json`. После этого перезапустите сервер (`serve`), чтобы применить новую модель.
 
-### 4. Полное обучение
-Если нужно переобучить сеть с нуля на комбинации системных шрифтов и ваших данных:
+```
+
+This will retrain the model **only** on your collected samples (very fast) and overwrite `model_weights.json`. After that, restart the server (`serve`) to apply the new model.
+
+### 4. Full Training
+
+If you need to retrain the network from scratch using a combination of system fonts and your data:
+
 ```bash
 cargo run --release -- train
+
 ```
 
 ---
 
-## 🛠 Технические детали (Solutions & Fixes)
+## Technical Details (Solutions & Fixes)
 
-*   **Rust**: Core logic, multithreading (`rayon`), HTTP server (`axum`).
-*   **TFHE/LWE**: Full custom implementation of crypto logic.
-*   **BigInt**: Client-side cryptography in pure JavaScript.
-*   **Neural Network**: Custom `Vec<f64>` / `Vec<u64>` implementation (no Torch/TensorFlow dependencies).
+* **Rust**: Core logic, multithreading (`rayon`), HTTP server (`axum`).
+* **TFHE/LWE**: Full custom implementation of crypto logic.
+* **BigInt**: Client-side cryptography in pure JavaScript.
+* **Neural Network**: Custom `Vec<f64>` / `Vec<u64>` implementation (no Torch/TensorFlow dependencies).
